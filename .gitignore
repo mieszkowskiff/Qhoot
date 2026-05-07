@@ -1,0 +1,41 @@
+# =========================
+# PYTHON & CLOUD FUNCTIONS
+# =========================
+# Ignorujemy środowiska wirtualne (w jakimkolwiek podfolderze się znajdują)
+venv/
+env/
+
+# Ignorujemy pliki tymczasowe i cache Pythona
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# ZMIENNE ŚRODOWISKOWE (SEKRETY)
+# =========================
+# To najważniejsza linijka! Zapobiega wyciekowi Twoich ID i haseł
+.env
+
+# =========================
+# TERRAFORM
+# =========================
+# Ignorujemy pobrane wtyczki (provider-y)
+.terraform/
+
+# Ignorujemy pliki stanu (bardzo ważne, często zawierają wrażliwe dane chmurowe!)
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# =========================
+# PLIKI GENEROWANE
+# =========================
+# Ignorujemy paczki ZIP, które Terraform tworzy z Twojego kodu Cloud Functions
+*.zip
+
+# =========================
+# SYSTEMOWE
+# =========================
+# Ignorujemy ukryte pliki systemowe (np. z macOS)
+.DS_Store
