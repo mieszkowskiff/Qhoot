@@ -43,7 +43,7 @@ resource "google_project_service" "eventarc" {
 # Assuming this Terraform code is executed from the /IaC directory
 data "archive_file" "worker_source" {
   type        = "zip"
-  source_dir  = "${path.module}/../CloudFunctions/VoteWorker"
+  source_dir  = "${path.module}/../vote_worker"
   output_path = "${path.module}/worker-source.zip"
 }
 

@@ -1,4 +1,0 @@
-functions-framework==3.*
-google-cloud-bigquery
-google-cloud-firestore
-python-dotenv
