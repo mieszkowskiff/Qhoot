@@ -28,6 +28,10 @@ gcloud auth application-default login
 Follow these steps to deploy the infrastructure to your GCP project:
 
 **Step 1: Initialize Terraform**
+Before running terraform apply, build the function zip:
+cd analytics_worker && zip analytics_worker.zip main.py requirements.txt
+
+
 Downloads the required provider plugins (Google Cloud).
 ```bash
 terraform init
