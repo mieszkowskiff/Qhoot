@@ -44,7 +44,7 @@ resource "google_project_service" "eventarc" {
 data "archive_file" "worker_source" {
   type        = "zip"
   source_dir  = "${path.module}/../vote_worker"
-  output_path = "${path.module}/worker-source.zip"
+  output_path = "${path.module}/.terraform/worker-source.zip"
 }
 
 # Uploads the generated zip file to the Cloud Storage bucket
