@@ -1,0 +1,22 @@
+{
+  "projects": {
+    "default": "ahds-adhs-ajds-sjhd-djsh"
+  },
+  "targets": {
+    "your-project-id": {
+      "hosting": {
+        "host": [
+          "qhoot-host"
+        ]
+      }
+    },
+    "ahds-adhs-ajds-sjhd-djsh": {
+      "hosting": {
+        "host": [
+          "qhoot-host"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

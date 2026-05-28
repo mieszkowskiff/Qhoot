@@ -106,3 +106,20 @@ Uses Firebase Auth with Google Sign-In. Only the host who created a room can acc
 
 - Player answers are currently written **directly to Firestore** from the player frontend. In production this should go through the API Gateway → Pub/Sub → Worker pipeline to handle the Thundering Herd problem.
 - Firestore security rules are currently open (`allow read, write: if true`). These should be tightened before any public deployment.
+
+# Deploying Frontend Changes
+
+```bash
+cd frontend/host
+npm run build
+firebase deploy --only hosting:host
+```
+
+Live at: `https://qhoot-host.web.app`
+
+
+## Notes
+
+- Always run `npm run build` before deploying — Firebase serves the `dist/` folder, not the source files.
+- Environment variables are baked in at build time from the `.env` file. If you change `.env`, rebuild before deploying.
+- The `.env` file is not committed to git — make sure it exists locally before building.

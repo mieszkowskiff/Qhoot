@@ -92,3 +92,13 @@ Runs on `http://localhost:5174` by default (configured in `vite.config.js`).
 - Player answers are currently written **directly to Firestore**. In production this should go through the API Gateway → Pub/Sub → Worker pipeline to handle the Thundering Herd problem at scale.
 - `sessionStorage` means the player loses their session if they close the browser tab. A more robust solution would use a URL parameter or localStorage.
 - Firestore security rules are currently open (`allow read, write: if true`). These should be tightened before any public deployment.
+
+## Player
+
+```bash
+cd frontend/player
+npm run build
+firebase deploy --only hosting:player
+```
+
+Live at: `https://qhoot-player.web.app`
