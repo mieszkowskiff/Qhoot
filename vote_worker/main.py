@@ -4,53 +4,83 @@ import os
 import functions_framework
 from google.cloud import firestore
 
-
-# Attempt to load local environment variables
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass
 
-# Initialize Firestore client globally.
-# This prevents creating a new connection for every single vote,
-# significantly improving performance under spike loads.
 project_id = os.environ.get("PROJECT_ID", "your-project-id")
-db = firestore.Client(project=project_id)
+db = firestore.Client(project=project_id, database="qhoot-database")
 
-# Triggered by a message on the Pub/Sub topic.
-# The entry point name "process_vote" matches the one defined in Terraform.
 @functions_framework.cloud_event
 def process_vote(cloud_event):
-    """
-    Validates the incoming vote from Pub/Sub and securely updates Firestore.
-    """
     try:
-        # 1. Decode the Pub/Sub message
-        # The payload inside cloud_event.data is always base64 encoded by Google Cloud
+        # 1. Decode Pub/Sub message
         encoded_data = cloud_event.data["message"]["data"]
-        pubsub_message = base64.b64decode(encoded_data).decode("utf-8")
-        
-        # Parse the JSON string back into a Python dictionary
-        vote_data = json.loads(pubsub_message)
-        
-        player_name = vote_data.get("player")
-        answer = vote_data.get("answer")
-        
-        print(f"Processing vote from {player_name} with answer: {answer}")
+        vote_data = json.loads(base64.b64decode(encoded_data).decode("utf-8"))
 
-        # 2. Save to Firestore database
-        # Using a dummy collection "live_scores" for demonstration
-        doc_ref = db.collection("live_scores").document(player_name)
-        doc_ref.set({
-            "latest_answer": answer,
-            "timestamp": firestore.SERVER_TIMESTAMP
+        room_id = vote_data.get("roomId")
+        player_id = vote_data.get("playerId")
+        question_index = vote_data.get("questionIndex")
+        answer_index = vote_data.get("answerIndex")
+
+        print(f"Processing vote: room={room_id} player={player_id} question={question_index} answer={answer_index}")
+
+        # 2. Validate — check room exists and is on the right question
+        room_ref = db.collection("rooms").document(room_id)
+        room = room_ref.get()
+
+        if not room.exists:
+            print(f"Room {room_id} not found, skipping.")
+            return
+
+        room_data = room.to_dict()
+
+        if room_data.get("status") != "question":
+            print(f"Room {room_id} is not in question state, skipping.")
+            return
+
+        if room_data.get("currentQuestionIndex") != question_index:
+            print(f"Question index mismatch for room {room_id}, skipping (late vote).")
+            return
+
+        # 3. Get quiz and correct answer
+        quiz_id = room_data.get("quizId")
+        questions = (
+            db.collection("quizzes")
+            .document(quiz_id)
+            .collection("questions")
+            .order_by("order")
+            .stream()
+        )
+        questions_list = list(questions)
+
+        if question_index >= len(questions_list):
+            print(f"Question index {question_index} out of range, skipping.")
+            return
+
+        question_data = questions_list[question_index].to_dict()
+        correct_answer = question_data.get("correctAnswer")
+        is_correct = answer_index == correct_answer
+
+        # 4. Update player score atomically
+        player_ref = room_ref.collection("players").document(player_id)
+        player = player_ref.get()
+
+        if not player.exists:
+            print(f"Player {player_id} not found in room {room_id}, skipping.")
+            return
+
+        current_score = player.to_dict().get("score", 0)
+
+        player_ref.update({
+            "lastAnswer": answer_index,
+            "score": current_score + (100 if is_correct else 0),
         })
-        
-        print(f"Vote from {player_name} successfully saved to Firestore.")
+
+        print(f"Vote processed: player={player_id} correct={is_correct} score={current_score + (100 if is_correct else 0)}")
 
     except Exception as e:
         print(f"Error processing vote: {str(e)}")
-        # Raising the exception tells Pub/Sub that the execution failed,
-        # which triggers the retry mechanism defined in our architecture.
         raise e

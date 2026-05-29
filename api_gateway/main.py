@@ -1,5 +1,6 @@
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google.cloud import pubsub_v1
 import json
@@ -12,6 +13,13 @@ except ImportError:
     pass
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://qhoot-player.web.app", "https://qhoot-player.firebaseapp.com"],
+    allow_methods=["POST"],
+    allow_headers=["Content-Type"],
+)
 
 PROJECT_ID = os.environ.get("PROJECT_ID", "your-project-id")
 TOPIC_ID = os.environ.get("TOPIC_ID", "qhoot-incoming-votes")

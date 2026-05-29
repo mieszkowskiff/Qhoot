@@ -8,8 +8,7 @@ import {
   orderBy,
   query,
   getDocs,
-  updateDoc,
-  getDoc,
+
 } from "firebase/firestore";
 
 export default function Play() {
@@ -51,22 +50,21 @@ export default function Play() {
   }, [room?.quizId]);
 
   async function handleAnswer(answerIndex) {
-    if (answered) return;
-    setAnswered(true);
-    setSelectedAnswer(answerIndex);
+  if (answered) return;
+  setAnswered(true);
+  setSelectedAnswer(answerIndex);
 
-    const currentQuestion = questions[room.currentQuestionIndex];
-    const isCorrect = answerIndex === currentQuestion.correctAnswer;
-
-    const playerRef = doc(db, "rooms", roomId, "players", playerId);
-    const playerSnap = await getDoc(playerRef);
-    const currentScore = playerSnap.data()?.score ?? 0;
-
-    await updateDoc(playerRef, {
-      lastAnswer: answerIndex,
-      score: currentScore + (isCorrect ? 100 : 0),
-    });
-  }
+  await fetch(`${import.meta.env.VITE_API_GATEWAY_URL}/api/v1/vote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      roomId,
+      playerId,
+      questionIndex: room.currentQuestionIndex,
+      answerIndex,
+    }),
+  });
+}
 
   // Loading state
   if (!room || questions.length === 0) {

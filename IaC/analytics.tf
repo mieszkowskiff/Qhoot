@@ -107,14 +107,24 @@ resource "google_storage_bucket" "analytics_fn_source" {
   depends_on = [google_project_service.analytics_apis]
 }
 
+data "archive_file" "analytics_worker_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../analytics_worker"
+  output_path = "${path.module}/.terraform/analytics_worker.zip"
+  excludes    = [
+    "__pycache__",
+    "*.pyc",
+    ".env"
+  ]
+}
+
 resource "google_storage_bucket_object" "analytics_fn_zip" {
   name   = "analytics_worker.zip"
   bucket = google_storage_bucket.analytics_fn_source.name
-  # Build this zip before terraform apply:
-  # cd analytics_worker && zip analytics_worker.zip main.py requirements.txt
-  source = "${path.module}/analytics_worker/analytics_worker.zip"
-}
+  source = data.archive_file.analytics_worker_zip.output_path
 
+  depends_on = [data.archive_file.analytics_worker_zip]
+}
 # ── 4. Service account for the analytics Cloud Function ──────────────────────
 
 resource "google_service_account" "analytics_worker" {
@@ -204,6 +214,8 @@ resource "google_cloudfunctions2_function" "analytics_worker" {
       value     = "quizzes/{quizId}"
       operator  = "match-path-pattern"
     }
+
+    retry_policy = "RETRY_POLICY_DO_NOT_RETRY"
   }
 
   depends_on = [
