@@ -1,0 +1,115 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@theme",
+      "description": "Use the @theme directive to define your project's custom design tokens (colors, fonts, spacing, etc.). Tailwind generates utilities and CSS variables from these values.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @theme",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#theme"
+        }
+      ]
+    },
+    {
+      "name": "@tailwind",
+      "description": "Use the @tailwind directive to insert Tailwind's base, components, utilities and variants styles into your CSS.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @tailwind",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#tailwind"
+        }
+      ]
+    },
+    {
+      "name": "@apply",
+      "description": "Use the @apply directive to inline any existing utility classes into your own custom CSS.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @apply",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#apply"
+        }
+      ]
+    },
+    {
+      "name": "@layer",
+      "description": "Use the @layer directive to tell Tailwind which 'bucket' a set of custom styles belong to (base, components, or utilities).",
+      "references": [
+        {
+          "name": "Tailwind CSS: @layer",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#layer"
+        }
+      ]
+    },
+    {
+      "name": "@variant",
+      "description": "Use the @variant directive to apply a Tailwind variant to styles in your own CSS.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @variant",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#variant"
+        }
+      ]
+    },
+    {
+      "name": "@custom-variant",
+      "description": "Use the @custom-variant directive to add a custom variant in your project.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @custom-variant",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#custom-variant"
+        }
+      ]
+    },
+    {
+      "name": "@utility",
+      "description": "Use the @utility directive to add custom utilities to your project that work with Tailwind's variants like hover, focus and responsive breakpoints.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @utility",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#utility"
+        }
+      ]
+    },
+    {
+      "name": "@source",
+      "description": "Use the @source directive to explicitly register source files that Tailwind should scan for class names.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @source",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#source"
+        }
+      ]
+    },
+    {
+      "name": "@config",
+      "description": "Use the @config directive to load a legacy JavaScript-based configuration file.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @config",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#config"
+        }
+      ]
+    },
+    {
+      "name": "@plugin",
+      "description": "Use the @plugin directive to load a legacy JavaScript-based plugin.",
+      "references": [
+        {
+          "name": "Tailwind CSS: @plugin",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#plugin"
+        }
+      ]
+    },
+    {
+      "name": "@reference",
+      "description": "Use the @reference directive to import your main CSS file for reference without duplicating its output (useful in component <style> blocks).",
+      "references": [
+        {
+          "name": "Tailwind CSS: @reference",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#reference"
+        }
+      ]
+    }
+  ]
+}
