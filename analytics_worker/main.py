@@ -1,12 +1,10 @@
 # analytics_worker/main.py
 #
 # Cloud Function (Gen2) triggered by Eventarc on Firestore document update.
-# Fires for every /quizzes/{quizId} update — exits early if status != "finished".
-# On quiz completion: reads all subcollections from Firestore,
-# aggregates stats, and streams rows to BigQuery (visible in ~seconds).
+# Fires for every /rooms/{roomId} update.
+# Reads room status directly from Firestore instead of parsing Protobuf event data.
 
 import os
-import json
 import logging
 from datetime import datetime, timezone
 
@@ -16,21 +14,23 @@ from google.cloud import firestore, bigquery
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-PROJECT_ID    = os.environ["GCP_PROJECT_ID"]
-DB_NAME       = os.environ["FIRESTORE_DB_NAME"]
-BQ_DATASET    = os.environ["BQ_DATASET"]
-NOW           = lambda: datetime.now(timezone.utc).isoformat()
+PROJECT_ID = os.environ["GCP_PROJECT_ID"]
+DB_NAME    = os.environ["FIRESTORE_DB_NAME"]
+BQ_DATASET = os.environ["BQ_DATASET"]
+
+def NOW() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 _fs_client = None
 _bq_client = None
 
-def fs():
+def fs() -> firestore.Client:
     global _fs_client
     if _fs_client is None:
         _fs_client = firestore.Client(project=PROJECT_ID, database=DB_NAME)
     return _fs_client
 
-def bq():
+def bq() -> bigquery.Client:
     global _bq_client
     if _bq_client is None:
         _bq_client = bigquery.Client(project=PROJECT_ID)
@@ -38,154 +38,201 @@ def bq():
 
 
 @functions_framework.cloud_event
-def process_quiz_completion(cloud_event):
+def process_room_completion(cloud_event):
     """
-    Entry point — called by Eventarc on every /quizzes/{quizId} update.
-    Exits immediately unless quiz.status just changed to 'finished'.
+    Entry point — called by Eventarc on every /rooms/{roomId} update.
+    Extracts room_id from event path, then reads status directly from Firestore.
     """
-    data = cloud_event.data
+    print("=== ANALYTICS WORKER CALLED ===")
 
-    # Eventarc Firestore events carry old/new field values
-    new_fields = data.get("value", {}).get("fields", {})
-    old_fields = data.get("oldValue", {}).get("fields", {})
+    # Wyciągnij room_id z document name w evencie
+    # Eventarc zawsze dostarcza document path nawet gdy data jest Protobuf
+    room_id = None
+    try:
+        data = cloud_event.data
+        # Próbuj jako dict (JSON mode)
+        if isinstance(data, dict):
+            resource_name = data.get("value", {}).get("name", "") or data.get("name", "")
+            room_id = resource_name.split("/")[-1] if resource_name else None
+    except Exception as e:
+        print(f"Could not parse event data as dict: {e}")
 
-    new_status = _str_field(new_fields, "status")
-    old_status = _str_field(old_fields, "status")
+    # Fallback: wyciągnij z atrybutów CloudEvent
+    if not room_id:
+        try:
+            doc_path = cloud_event.get("document", "") or cloud_event.get("subject", "")
+            if doc_path:
+                room_id = doc_path.split("/")[-1]
+        except Exception as e:
+            print(f"Could not get room_id from attributes: {e}")
 
-    # Only process the exact moment quiz transitions to "finished"
-    if new_status != "finished" or old_status == "finished":
-        log.info("Skipping update — status: %s → %s", old_status, new_status)
+    # Ostatni fallback: spróbuj z bytes
+    if not room_id:
+        try:
+            raw = cloud_event.data
+            if isinstance(raw, (bytes, bytearray)):
+                text = raw.decode("utf-8", errors="ignore")
+                # Szukaj patterns jak "rooms/XXXXX"
+                import re
+                match = re.search(r'rooms/([A-Za-z0-9]+)', text)
+                if match:
+                    room_id = match.group(1)
+        except Exception as e:
+            print(f"Could not extract room_id from bytes: {e}")
+
+    print(f"Extracted room_id: {room_id}")
+
+    if not room_id or room_id == "qhoot-database":
+        print("Could not extract valid room_id, skipping.")
         return
 
-    # Extract quizId from the Firestore document path
-    # Path format: projects/{proj}/databases/{db}/documents/quizzes/{quizId}
-    resource_name = data.get("value", {}).get("name", "")
-    quiz_id = resource_name.split("/")[-1]
+    # Czytaj status bezpośrednio z Firestore zamiast z eventu
+    room_ref = fs().collection("rooms").document(room_id)
+    room_doc = room_ref.get()
 
-    log.info("Quiz finished: %s — starting analytics aggregation", quiz_id)
+    if not room_doc.exists:
+        print(f"Room {room_id} not found in Firestore, skipping.")
+        return
+
+    room_data = room_doc.to_dict()
+    status = room_data.get("status")
+    print(f"Room {room_id} status: {status}")
+
+    if status != "finished":
+        print(f"Room {room_id} is not finished (status={status}), skipping.")
+        return
+
+    # Sprawdź czy już przetworzony (idempotency)
+    if room_data.get("analyticsProcessed"):
+        print(f"Room {room_id} already processed, skipping.")
+        return
+
+    print(f"Room {room_id} finished — starting analytics aggregation")
 
     try:
-        _aggregate_and_stream(quiz_id, new_fields)
-        log.info("Analytics done for quiz: %s", quiz_id)
+        _aggregate_and_stream(room_id, room_data)
+        # Oznacz jako przetworzone żeby nie duplikować przy retry
+        print(f"Analytics done for room: {room_id}")
     except Exception as exc:
-        log.exception("Analytics failed for quiz %s: %s", quiz_id, exc)
-        raise  # re-raise so Eventarc retries
+        print(f"Analytics failed for room {room_id}: {exc}")
+        raise
 
 
-def _aggregate_and_stream(quiz_id: str, quiz_fields: dict):
+def _aggregate_and_stream(room_id: str, room_data: dict):
     inserted_at = NOW()
-    quiz_ref = fs().collection("quizzes").document(quiz_id)
+    room_ref = fs().collection("rooms").document(room_id)
+    quiz_id = room_data.get("quizId")
 
-    # ── Load players ─────────────────────────────────────────────────────────
+    # ── Load players ──────────────────────────────────────────────────────────
     players = {
         doc.id: doc.to_dict()
-        for doc in quiz_ref.collection("players").stream()
+        for doc in room_ref.collection("players").stream()
     }
+
+    if not players:
+        print(f"No players found for room {room_id}, skipping.")
+        return
+
+    print(f"Found {len(players)} players")
 
     # ── Load questions ────────────────────────────────────────────────────────
-    questions = {
-        doc.id: doc.to_dict()
-        for doc in quiz_ref.collection("questions").stream()
-    }
+    questions = {}
+    if quiz_id:
+        questions = {
+            doc.id: doc.to_dict()
+            for doc in fs().collection("quizzes")
+                           .document(quiz_id)
+                           .collection("questions")
+                           .order_by("order")
+                           .stream()
+        }
+    print(f"Found {len(questions)} questions")
 
-    # ── Load answers ──────────────────────────────────────────────────────────
-    answers = [doc.to_dict() for doc in quiz_ref.collection("answers").stream()]
+    # ── Per-question stats ────────────────────────────────────────────────────
+    q_stats: dict[int, dict] = {}
 
-    # ── Compute per-question stats ────────────────────────────────────────────
-    q_stats: dict[str, dict] = {qid: {"total": 0, "correct": 0, "total_ms": 0} for qid in questions}
+    for player_data in players.values():
+        answers = player_data.get("answers") or {}
+        for key, ans in answers.items():
+            if not isinstance(ans, dict):
+                continue
+            try:
+                q_index = int(key[1:])
+            except (ValueError, IndexError):
+                continue
+            if q_index not in q_stats:
+                q_stats[q_index] = {"total": 0, "correct": 0}
+            q_stats[q_index]["total"] += 1
+            if ans.get("isCorrect"):
+                q_stats[q_index]["correct"] += 1
 
-    for ans in answers:
-        qid = ans.get("questionId")
-        if qid not in q_stats:
-            continue
-        q_stats[qid]["total"]    += 1
-        q_stats[qid]["correct"]  += 1 if ans.get("isCorrect") else 0
-        q_stats[qid]["total_ms"] += ans.get("responseTimeMs", 0)
+    ordered_questions = sorted(questions.items(), key=lambda x: x[1].get("order", 0))
 
     question_rows = []
-    for qid, q in questions.items():
-        stat = q_stats.get(qid, {})
-        total = stat.get("total", 0)
-        correct = stat.get("correct", 0)
+    for q_index, (q_id, q_data) in enumerate(ordered_questions):
+        stat = q_stats.get(q_index, {"total": 0, "correct": 0})
+        total = stat["total"]
+        correct = stat["correct"]
         question_rows.append({
-            "quiz_id":         quiz_id,
-            "question_id":     qid,
-            "question_text":   q.get("text", ""),
-            "question_order":  q.get("order"),
+            "room_id":         room_id,
+            "question_id":     q_id,
+            "question_index":  q_index,
+            "question_text":   q_data.get("text", ""),
             "total_answers":   total,
             "correct_answers": correct,
             "correct_rate":    round(correct / total, 4) if total > 0 else None,
-            "avg_response_ms": (stat["total_ms"] // total) if total > 0 else None,
             "inserted_at":     inserted_at,
         })
 
-    # ── Compute per-player results with ranking ───────────────────────────────
-    player_scores = sorted(
+    # ── Per-player results ────────────────────────────────────────────────────
+    player_rows = sorted(
         [
             {
-                "quiz_id":       quiz_id,
+                "room_id":       room_id,
                 "player_id":     pid,
-                "nickname":      p.get("nickname"),
-                "total_score":   p.get("totalScore", 0),
+                "nickname":      p.get("nickname") or p.get("name"),
+                "final_score":   p.get("score", 0),
                 "correct_count": sum(
-                    1 for a in answers
-                    if a.get("playerId") == pid and a.get("isCorrect")
+                    1 for ans in (p.get("answers") or {}).values()
+                    if isinstance(ans, dict) and ans.get("isCorrect")
                 ),
-                "joined_at":     _ts_field(p, "joinedAt"),
+                "rank":          None,
                 "inserted_at":   inserted_at,
             }
             for pid, p in players.items()
         ],
-        key=lambda x: x["total_score"],
+        key=lambda x: x["final_score"],
         reverse=True,
     )
-    for rank, row in enumerate(player_scores, start=1):
+    for rank, row in enumerate(player_rows, start=1):
         row["rank"] = rank
 
-    # ── Compute quiz session aggregate ────────────────────────────────────────
-    scores = [r["total_score"] for r in player_scores]
+    # ── Quiz session aggregate ────────────────────────────────────────────────
+    scores = [r["final_score"] for r in player_rows]
     session_row = {
+        "room_id":        room_id,
         "quiz_id":        quiz_id,
-        "title":          _str_field(quiz_fields, "title"),
-        "host_id":        _str_field(quiz_fields, "hostId"),
         "player_count":   len(players),
         "question_count": len(questions),
         "avg_score":      round(sum(scores) / len(scores), 2) if scores else None,
         "max_score":      max(scores) if scores else None,
-        "created_at":     _str_field(quiz_fields, "createdAt"),
-        "finished_at":    _str_field(quiz_fields, "finishedAt"),
+        "finished_at":    NOW(),
         "inserted_at":    inserted_at,
     }
 
-    # ── Stream all rows to BigQuery ───────────────────────────────────────────
-    # insert_rows_json uses the BigQuery Storage Write API streaming path —
-    # data is available for querying within seconds of insertion.
-    _bq_insert(f"{BQ_DATASET}.quiz_sessions",   [session_row])
-    _bq_insert(f"{BQ_DATASET}.question_stats",  question_rows)
-    _bq_insert(f"{BQ_DATASET}.player_results",  player_scores)
+    print(f"Inserting: session={session_row}, players={len(player_rows)}, questions={len(question_rows)}")
+
+    # ── Stream to BigQuery ────────────────────────────────────────────────────
+    _bq_insert(f"{BQ_DATASET}.quiz_sessions",  [session_row])
+    _bq_insert(f"{BQ_DATASET}.player_results", player_rows)
+    _bq_insert(f"{BQ_DATASET}.question_stats", question_rows)
 
 
 def _bq_insert(table: str, rows: list[dict]):
     if not rows:
+        print(f"No rows to insert for {table}")
         return
     errors = bq().insert_rows_json(table, rows)
     if errors:
         raise RuntimeError(f"BigQuery insert errors for {table}: {errors}")
-    log.info("Inserted %d rows into %s", len(rows), table)
-
-
-# ── Firestore field value helpers ─────────────────────────────────────────────
-# Eventarc sends Firestore field values as typed wrappers, e.g.:
-#   { "stringValue": "finished" }  or  { "timestampValue": "2025-04-01T..." }
-
-def _str_field(fields: dict, key: str) -> str | None:
-    return fields.get(key, {}).get("stringValue")
-
-def _ts_field(doc: dict, key: str) -> str | None:
-    val = doc.get(key)
-    if val is None:
-        return None
-    # Firestore SDK returns datetime objects
-    if hasattr(val, "isoformat"):
-        return val.isoformat()
-    return str(val)
+    print(f"Inserted {len(rows)} rows into {table}")

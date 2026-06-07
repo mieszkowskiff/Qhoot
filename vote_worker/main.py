@@ -64,7 +64,7 @@ def process_vote(cloud_event):
         correct_answer = question_data.get("correctAnswer")
         is_correct = answer_index == correct_answer
 
-        # 4. Update player score atomically
+        # 4. Update player score + save per-question answer history
         player_ref = room_ref.collection("players").document(player_id)
         player = player_ref.get()
 
@@ -73,13 +73,19 @@ def process_vote(cloud_event):
             return
 
         current_score = player.to_dict().get("score", 0)
+        new_score = current_score + (100 if is_correct else 0)
 
         player_ref.update({
             "lastAnswer": answer_index,
-            "score": current_score + (100 if is_correct else 0),
+            "score": new_score,
+            # Historia odpowiedzi per pytanie — używana przez analytics_worker
+            f"answers.q{question_index}": {
+                "isCorrect": is_correct,
+                "answerIndex": answer_index,
+            }
         })
 
-        print(f"Vote processed: player={player_id} correct={is_correct} score={current_score + (100 if is_correct else 0)}")
+        print(f"Vote processed: player={player_id} correct={is_correct} score={new_score}")
 
     except Exception as e:
         print(f"Error processing vote: {str(e)}")
