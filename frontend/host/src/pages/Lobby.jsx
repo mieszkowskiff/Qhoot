@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { Users, Play } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function Lobby() {
   const { roomId } = useParams();
@@ -67,8 +68,19 @@ export default function Lobby() {
             {roomId}
           </p>
           <p className="mt-5 text-sm tracking-wide text-stone-soft">
-            Share this code with your players.
+            Share this code or scan to join.
           </p>
+          <div className="mt-6 flex justify-center">
+            <div className="rounded-2xl border border-line bg-alabaster p-4 shadow-[0_1px_2px_rgba(42,39,36,0.06)]">
+              <QRCodeSVG
+                value={`https://qhoot-player.web.app/join?code=${roomId}`}
+                size={160}
+                bgColor="transparent"
+                fgColor="#1B2A4A"
+                level="M"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Players */}

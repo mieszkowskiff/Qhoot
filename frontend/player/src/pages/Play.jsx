@@ -12,7 +12,7 @@ import {
 import { Check, X, Hourglass } from "lucide-react";
 
 // Lettered markers lend each option an engraved, examination-paper feel.
-const OPTION_LABELS = ["A", "B", "C", "D", "E", "F"];
+const OPTION_LABELS = ["A", "B", "C", "D"];
 
 export default function Play() {
   const { roomId } = useParams();
@@ -20,10 +20,19 @@ export default function Play() {
 
   const [room, setRoom] = useState(null);
   const [questions, setQuestions] = useState([]);
-  const [answered, setAnswered] = useState(false);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [answeredMap, setAnsweredMap] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("answeredMap") || "{}");
+    } catch {
+      return {};
+    }
+  });
 
   const playerId = sessionStorage.getItem("playerId");
+
+  const currentIndex = room?.currentQuestionIndex ?? 0;
+  const answered = currentIndex in answeredMap;
+  const selectedAnswer = answeredMap[currentIndex] ?? null;
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "rooms", roomId), (snap) => {
@@ -35,11 +44,6 @@ export default function Play() {
     });
     return () => unsubscribe();
   }, [roomId]);
-
-  useEffect(() => {
-    setAnswered(false);
-    setSelectedAnswer(null);
-  }, [room?.currentQuestionIndex]);
 
   useEffect(() => {
     if (!room?.quizId) return;
@@ -54,8 +58,9 @@ export default function Play() {
 
   async function handleAnswer(answerIndex) {
     if (answered) return;
-    setAnswered(true);
-    setSelectedAnswer(answerIndex);
+    const newMap = { ...answeredMap, [currentIndex]: answerIndex };
+    setAnsweredMap(newMap);
+    sessionStorage.setItem("answeredMap", JSON.stringify(newMap));
 
     await fetch(`${import.meta.env.VITE_API_GATEWAY_URL}/api/v1/vote`, {
       method: "POST",

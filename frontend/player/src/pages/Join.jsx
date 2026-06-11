@@ -1,13 +1,14 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { db } from "../firebase";
 import { doc, getDoc, collection, addDoc } from "firebase/firestore";
 import { AlertCircle } from "lucide-react";
 
 export default function Join() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [roomCode, setRoomCode] = useState("");
+  const [roomCode, setRoomCode] = useState(searchParams.get("code")?.toUpperCase() ?? "");
   const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -85,7 +86,7 @@ export default function Join() {
               Nickname
             </label>
             <input
-              className="mt-2 w-full rounded-xl border border-line bg-alabaster px-4 py-3.5 text-base text-ink placeholder:text-stone-soft focus:border-oxford focus:outline-none focus:ring-2 focus:ring-oxford/15"
+              className="mt-2 w-full rounded-xl border border-line bg-alabaster px-4 py-3.5 text-center text-base text-ink placeholder:text-stone-soft focus:border-oxford focus:outline-none focus:ring-2 focus:ring-oxford/15"
               placeholder="Your nickname"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}

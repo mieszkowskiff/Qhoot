@@ -21,7 +21,7 @@ import {
 } from "recharts";
 import { ArrowRight, Flag, Trophy, Users } from "lucide-react";
 
-const COLORS = ["#23395b", "#b08d57", "#6e2433", "#2c3e63"];
+const COLORS = ["#6e2433"];
 const CORRECT_COLOR = "#1b2a4a";
 
 export default function LiveDashboard() {
@@ -70,6 +70,12 @@ export default function LiveDashboard() {
 
   async function handleNext() {
     const nextIndex = room.currentQuestionIndex + 1;
+    const resetPromises = players.map((p) =>
+      updateDoc(doc(db, "rooms", roomId, "players", p.id), {
+        lastAnswer: null,
+      })
+    );
+    await Promise.all(resetPromises);
     if (nextIndex >= questions.length) {
       await updateDoc(doc(db, "rooms", roomId), { status: "finished" });
     } else {

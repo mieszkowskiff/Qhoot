@@ -8,6 +8,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Join />} />
+        <Route path="/join" element={<Join />} />
         <Route path="/play/:roomId" element={<Play />} />
         <Route path="/results/:roomId" element={<Results />} />
       </Routes>
