@@ -24,32 +24,28 @@ from datetime import datetime, timezone
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 API_GATEWAY_URL = "https://qhoot-api-gateway-221815489759.europe-central2.run.app"
-
 # Firebase project config — copy from frontend/.env.local
 FIREBASE_PROJECT_ID = "ahds-adhs-ajds-sjhd-djsh"
 FIREBASE_API_KEY    = "YOUR_FIREBASE_API_KEY"   # VITE_FIREBASE_API_KEY from .env.local
 
-ROOM_ID        = "GYZC2M"  # create a fresh room in the host frontend first
-QUESTION_INDEX = 0          # question number to vote on (0-based)
-NUM_PLAYERS    = 50         # number of simultaneous players to simulate
+ROOM_ID        = "X34FUB"  # create a fresh room in the host frontend first
+QUESTION_INDEX = 1          # question number to vote on (0-based)
+NUM_PLAYERS    = 100        # number of simultaneous players to simulate
 NUM_ANSWERS    = 4          # number of answer options for this question
 
 NICKNAMES = [
-    "Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Hank",
+    "JestemFajny", "Funny67", "HelloWorld", "WillYouMarryMe", "Eve", "Frank", "Grace", "Hank",
     "Iris", "Jack", "Karen", "Leo", "Mia", "Nick", "Olivia", "Pete",
-    "Quinn", "Rose", "Sam", "Tina", "Uma", "Victor", "Wendy", "Xander",
-    "Yara", "Zoe", "Aaron", "Bella", "Carl", "Daisy", "Eli", "Fiona",
+    "HIhi", "Rose", "Sam", "C'estlavie", "Uma", "Victor", "Wendy", "Xander",
     "George", "Holly", "Ivan", "Julia", "Kevin", "Luna", "Marco", "Nina",
-    "Oscar", "Paula", "Remy", "Sara", "Tom", "Una", "Vera", "Will",
-    "Xena", "Yogi",
+    "Oscar", "Paula", "Remy", "Sara", "Tom", "Xena", "Yoda",
 ]
 
 # ── Firestore REST helpers ────────────────────────────────────────────────────
 # We use the Firestore REST API to create players directly,
 # exactly like Join.jsx does via the Firebase JS SDK.
 
-FIRESTORE_BASE = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents"
-
+FIRESTORE_BASE = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/qhoot-database/documents"
 
 def firestore_value(val):
     """Convert a Python value to a Firestore REST API value wrapper."""
